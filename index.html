@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dots and Boxes</title>
+    <style>
+        body {
+            background-image: url("https://img.freepik.com/free-vector/vector-abstract-background-design-wavy_2065-243.jpg?semt=ais_hybrid");
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center center;
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        /* Centering the game container */
+        .game-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .game-container {
+            display: grid;
+            gap: 0;
+            margin-top: 20px;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            background-color: black;
+            border-radius: 50%;
+            margin: auto;
+        }
+
+        .line {
+            position: relative;
+            background-color: #dc2424;
+            transition: background-color 0.3s;
+        }
+
+        /* Centering the horizontal line */
+        .line.horizontal {
+            height: 5px;
+            width: 50px;
+            margin: auto;
+        }
+
+        /* Centering the vertical line */
+        .line.vertical {
+            height: 50px;
+            width: 5px;
+            margin: auto;
+        }
+
+        .line.active {
+            background-color: #1a1b1b;
+        }
+
+        .line:hover {
+            background-color: rgba(52, 152, 219, 0.3);
+        }
+
+        .box {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;
+            font-weight: bold;
+            background-color: #ecf0f1;
+            width: 50px;
+            height: 50px;
+        }
+
+        .winner {
+            margin-top: 20px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .turn-indicator {
+            margin-top: 10px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        /* Restart Button */
+        .restart-btn {
+            margin-top: 15px;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            background-color: #007BFF;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .restart-btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Dots and Boxes</h1>
+
+    <div class="game-wrapper">
+        <div class="game-container" id="gameContainer"></div>
+        <div class="turn-indicator" id="turnIndicator">Current Turn: Player 1</div>
+        <div class="winner" id="winner"></div>
+        <button class="restart-btn" onclick="restartGame()">Restart Game</button>
+    </div>
+
+    <script>
+        let rows = prompt("Enter number of rows");
+        let cols = prompt("Enter number of columns");
+
+        const gameContainer = document.getElementById('gameContainer'); 
+        const winnerDisplay = document.getElementById('winner');
+        const turnIndicator = document.getElementById('turnIndicator');
+
+        let currentPlayer = 'Player 1';
+        const scores = { 'Player 1': 0, 'Player 2': 0 };
+        let lines = [];
+        let boxes = [];
+
+        function initializeGame() {
+            gameContainer.innerHTML = "";
+            lines = [];
+            boxes = [];
+
+            // Configure the grid
+            gameContainer.style.gridTemplateColumns = `repeat(${cols * 2 - 1}, 50px)`;
+            gameContainer.style.gridTemplateRows = `repeat(${rows * 2 - 1}, 50px)`;
+
+            // Initialize the grid
+            for (let row = 0; row < rows * 2 - 1; row++) {
+                for (let col = 0; col < cols * 2 - 1; col++) {
+                    const element = document.createElement('div');
+
+                    if (row % 2 === 0 && col % 2 === 0) {
+                        // Create dots
+                        element.classList.add('dot');
+                    } else if (row % 2 === 0 || col % 2 === 0) {
+                        // Create lines
+                        element.classList.add('line');
+                        element.classList.add(row % 2 !== 0 ? 'vertical' : 'horizontal');
+                        element.dataset.row = row;
+                        element.dataset.col = col;
+                        element.addEventListener('click', handleLineClick);
+
+                        lines.push({ row, col, active: false });
+                    } else {
+                        // Create boxes
+                        element.classList.add('box');
+                        element.dataset.row = row;
+                        element.dataset.col = col;
+                        boxes.push({ row, col, owner: null });
+                    }
+
+                    gameContainer.appendChild(element);
+                }
+            }
+        }
+
+        function handleLineClick(event) {
+            const line = event.target;
+            const row = parseInt(line.dataset.row);
+            const col = parseInt(line.dataset.col);
+
+            // Check if the line is already active
+            const lineData = lines.find(l => l.row === row && l.col === col);
+            if (lineData.active) return;
+
+            // Activate the line
+            line.classList.add('active');
+            lineData.active = true;
+
+            // Check for completed boxes
+            let boxCompleted = false;
+            boxes.forEach(box => {
+                if (!box.owner && isBoxComplete(box)) {
+                    box.owner = currentPlayer;
+                    document.querySelector(`.box[data-row='${box.row}'][data-col='${box.col}']`).textContent = currentPlayer;
+                    scores[currentPlayer]++;
+                    boxCompleted = true;
+                }
+            });
+
+            // Switch player if no box was completed
+            if (!boxCompleted) {
+                currentPlayer = currentPlayer === 'Player 1' ? 'Player 2' : 'Player 1';
+                updateTurnIndicator();
+            }
+
+            // Check for game over
+            if (lines.every(line => line.active)) {
+                displayWinner();
+            }
+        }
+
+        function isBoxComplete(box) {
+            const { row, col } = box;
+            const top = lines.find(l => l.row === row - 1 && l.col === col);
+            const bottom = lines.find(l => l.row === row + 1 && l.col === col);
+            const left = lines.find(l => l.row === row && l.col === col - 1);
+            const right = lines.find(l => l.row === row && l.col === col + 1);
+
+            return top?.active && bottom?.active && left?.active && right?.active;
+        }
+
+        function displayWinner() {
+            const player1Score = scores['Player 1'];
+            const player2Score = scores['Player 2'];
+
+            if (player1Score > player2Score) {
+                winnerDisplay.textContent = `🎉 Winner: Player 1 with ${player1Score} boxes!`;
+            } else if (player2Score > player1Score) {
+                winnerDisplay.textContent = `🎉 Winner: Player 2 with ${player2Score} boxes!`;
+            } else {
+                winnerDisplay.textContent = `It's a tie! Both players have ${player1Score} boxes.`;
+            }
+        }
+
+        function updateTurnIndicator() {
+            turnIndicator.textContent = `Current Turn: ${currentPlayer}`;
+        }
+
+        function restartGame() {
+            rows = prompt("Enter number of rows");
+            cols = prompt("Enter number of columns");
+            currentPlayer = 'Player 1';
+            scores['Player 1'] = 0;
+            scores['Player 2'] = 0;
+            winnerDisplay.textContent = "";
+            updateTurnIndicator();
+            initializeGame();
+        }
+
+        initializeGame();
+    </script>
+</body>
+</html>
